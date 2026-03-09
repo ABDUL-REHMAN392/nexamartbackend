@@ -544,3 +544,20 @@ export const getMe = async (req, res) => {
     return errorResponse(res, 500, error.message);
   }
 };
+
+// OAuth Callback (Google + Facebook)
+export const oauthCallback = async (req, res) => {
+  try {
+    const user = req.user;
+    const accessToken = generateAccessToken(user._id);
+    const refreshToken = generateRefreshToken(user._id);
+    user.refreshToken = refreshToken;
+    user.lastLogin = new Date();
+    await user.save();
+    setAccessTokenCookie(res, accessToken);
+    setRefreshTokenCookie(res, refreshToken);
+    res.redirect(`${process.env.FRONTEND_URL}/oauth-success`);
+  } catch (error) {
+    res.redirect(`${process.env.FRONTEND_URL}/login?error=oauth_failed`);
+  }
+};
