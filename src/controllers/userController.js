@@ -1,6 +1,9 @@
 import User from "../models/User.js";
 import { successResponse, errorResponse } from "../utils/apiResponse.js";
-
+import {
+  uploadAvatarToCloudinary,
+  deleteAvatarFromCloudinary,
+} from "../config/cloudinary.js";
 // GET /api/users/profile
 export const getProfile = async (req, res) => {
   try {
@@ -115,6 +118,45 @@ export const changePassword = async (req, res) => {
       200,
       "Password changed successfully! Please login again",
     );
+  } catch (error) {
+    return errorResponse(res, 500, error.message);
+  }
+};
+
+// POST /api/users/avatar
+export const uploadAvatar = async (req, res) => {
+  try {
+    if (!req.file)
+      return errorResponse(res, 400, "Please select an image to upload");
+
+    const userId = req.user._id;
+    const result = await uploadAvatarToCloudinary(req.file.buffer, userId);
+    const user = await User.findByIdAndUpdate(
+      userId,
+      { avatar: result.secure_url },
+      { new: true },
+    );
+    if (!user) return errorResponse(res, 404, "User not found");
+
+    return successResponse(res, 200, "Avatar uploaded successfully", {
+      avatar: user.avatar,
+    });
+  } catch (error) {
+    return errorResponse(res, 500, error.message);
+  }
+};
+
+// DELETE /api/users/avatar
+export const removeAvatar = async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id);
+    if (!user) return errorResponse(res, 404, "User not found");
+    if (!user.avatar) return errorResponse(res, 400, "No avatar to remove");
+
+    await deleteAvatarFromCloudinary(req.user._id);
+    await User.findByIdAndUpdate(req.user._id, { avatar: null });
+
+    return successResponse(res, 200, "Avatar removed successfully");
   } catch (error) {
     return errorResponse(res, 500, error.message);
   }
