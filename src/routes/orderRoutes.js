@@ -8,6 +8,7 @@ import {
   updateOrderStatus,
 } from "../controllers/orderController.js";
 import { adminOnly, protect } from "../middlewares/authMiddleware.js";
+import { createPaymentIntent } from "../controllers/stripeController.js";
 
 const router = express.Router();
 
@@ -16,6 +17,7 @@ router.use(protect);
 
 router.get("/", getMyOrders);
 router.post("/", placeOrder);
+router.post("/create-payment-intent",  createPaymentIntent);   // Stripe — payment intent
 router.get("/:orderId", getOrderById);
 router.put("/:orderId/cancel", cancelOrder);
 
