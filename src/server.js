@@ -6,7 +6,9 @@ import connectDB from "./config/db.js";
 import passport from "./config/passport.js";
 import authRoutes from "./routes/authRoutes.js";
 import userRoutes from "./routes/userRoutes.js";
-import cartRoutes from "./routes/cartRoutes.js";  
+import cartRoutes from "./routes/cartRoutes.js";
+import orderRoutes from "./routes/orderRoutes.js";
+
 const app = express();
 
 connectDB();
@@ -19,11 +21,10 @@ app.use(passport.initialize());
 
 app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
-app.use("/api/cart",cartRoutes);
+app.use("/api/cart", cartRoutes);
+app.use("/api/orders", orderRoutes);
 
-app.get("/", (req, res) =>
-  res.json({ message: "nexmart" }),
-);
+app.get("/", (req, res) => res.json({ message: "nexmart" }));
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`🚀 Server: http://localhost:${PORT}`));
