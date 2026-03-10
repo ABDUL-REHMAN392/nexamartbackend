@@ -40,8 +40,12 @@ export const createPaymentIntent = async (req, res) => {
     // Amount cents mein hona chahiye (dollars) ya paisa (PKR)
     // PKR ke liye: rupees * 100
     const paymentIntent = await stripe.paymentIntents.create({
-      amount: Math.round(totalAmount * 100), // Paisa mein
+      amount: Math.round(totalAmount * 100),
       currency: "pkr",
+      automatic_payment_methods: {
+        enabled: true,
+        allow_redirects: "never", // Redirect wale methods band
+      },
       metadata: {
         userId: req.user._id.toString(),
         cartId: cart._id.toString(),
