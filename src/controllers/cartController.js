@@ -106,6 +106,78 @@ export const addToCart = async (req, res) => {
   }
 };
 
+// PUT /api/cart/:productId
+// Quantity update karo
+export const updateQuantity = async (req, res) => {
+  try {
+    const productId = parseInt(req.params.productId);
+    const { quantity } = req.body;
+
+    if (isNaN(productId) || productId <= 0)
+      return errorResponse(res, 400, "Invalid product ID");
+    if (quantity === undefined || quantity === null)
+      return errorResponse(res, 400, "Quantity is required");
+    if (typeof quantity !== "number" || quantity < 1)
+      return errorResponse(res, 400, "Quantity must be at least 1");
+    if (quantity > MAX_QUANTITY)
+      return errorResponse(res, 400, `Maximum quantity is ${MAX_QUANTITY}`);
+
+    const cart = await Cart.findOne({ user: req.user._id });
+    if (!cart) return errorResponse(res, 404, "Cart not found");
+
+    const item = cart.items.find((i) => i.productId === productId);
+    if (!item) return errorResponse(res, 404, "Item not found in cart");
+
+    item.quantity = quantity;
+    await cart.save();
+
+    return successResponse(res, 200, "Quantity updated", { cart });
+  } catch (error) {
+    return errorResponse(res, 500, error.message);
+  }
+};
+
+// DELETE /api/cart/:productId
+// Ek item remove karo
+export const removeFromCart = async (req, res) => {
+  try {
+    const productId = parseInt(req.params.productId);
+
+    if (isNaN(productId) || productId <= 0)
+      return errorResponse(res, 400, "Invalid product ID");
+
+    const cart = await Cart.findOne({ user: req.user._id });
+    if (!cart) return errorResponse(res, 404, "Cart not found");
+
+    const itemExists = cart.items.some((i) => i.productId === productId);
+    if (!itemExists) return errorResponse(res, 404, "Item not found in cart");
+
+    cart.items = cart.items.filter((i) => i.productId !== productId);
+    await cart.save();
+
+    return successResponse(res, 200, "Item removed from cart", { cart });
+  } catch (error) {
+    return errorResponse(res, 500, error.message);
+  }
+};
+
+// DELETE /api/cart
+// Poora cart clear karo
+export const clearCart = async (req, res) => {
+  try {
+    const cart = await Cart.findOne({ user: req.user._id });
+    if (!cart || cart.items.length === 0)
+      return errorResponse(res, 400, "Cart is already empty");
+
+    cart.items = [];
+    await cart.save();
+
+    return successResponse(res, 200, "Cart cleared", { cart });
+  } catch (error) {
+    return errorResponse(res, 500, error.message);
+  }
+};
+
 // POST /api/cart/merge
 // Login ke baad guest cart merge karo
 export const mergeCart = async (req, res) => {

@@ -6,7 +6,7 @@ import connectDB from "./config/db.js";
 import passport from "./config/passport.js";
 import authRoutes from "./routes/authRoutes.js";
 import userRoutes from "./routes/userRoutes.js";
-
+import cartRoutes from "./routes/cartRoutes.js";  
 const app = express();
 
 connectDB();
@@ -19,6 +19,7 @@ app.use(passport.initialize());
 
 app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
+app.use("/api/cart",cartRoutes);
 
 app.get("/", (req, res) =>
   res.json({ message: "nexmart" }),
