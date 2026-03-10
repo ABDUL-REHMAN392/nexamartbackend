@@ -1,6 +1,14 @@
-import { Resend } from "resend";
+import nodemailer from "nodemailer";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+const transporter = nodemailer.createTransport({
+  host: process.env.EMAIL_HOST,
+  port: parseInt(process.env.EMAIL_PORT),
+  secure: false,
+  auth: {
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASS,
+  },
+});
 
 // ─── Base Template ────────────────────────────────
 const baseTemplate = ({ content, previewText = "Nexamart" }) => `
@@ -330,8 +338,8 @@ const baseTemplate = ({ content, previewText = "Nexamart" }) => `
 
 const sendEmail = async ({ to, subject, html }) => {
   try {
-    await resend.emails.send({
-      from: process.env.EMAIL_FROM || "Nexamart <onboarding@resend.dev>",
+    await transporter.sendMail({
+      from: `"Nexamart" <${process.env.EMAIL_USER}>`,
       to,
       subject,
       html,
