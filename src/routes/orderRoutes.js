@@ -4,8 +4,10 @@ import {
   getOrderById,
   placeOrder,
   cancelOrder,
+  getAllOrders,
+  updateOrderStatus,
 } from "../controllers/orderController.js";
-import { protect } from "../middlewares/authMiddleware.js";
+import { adminOnly, protect } from "../middlewares/authMiddleware.js";
 
 const router = express.Router();
 
@@ -16,5 +18,9 @@ router.get("/", getMyOrders);
 router.post("/", placeOrder);
 router.get("/:orderId", getOrderById);
 router.put("/:orderId/cancel", cancelOrder);
+
+// ─── Admin Routes ─────────────────────────────────
+router.get("/admin/all", adminOnly, getAllOrders);
+router.put("/admin/:orderId/status", adminOnly, updateOrderStatus);
 
 export default router;

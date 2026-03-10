@@ -177,3 +177,94 @@ export const cancelOrder = async (req, res) => {
     return errorResponse(res, 500, error.message);
   }
 };
+// ─────────────────────────────────────────────────
+// ADMIN ROUTES
+// ─────────────────────────────────────────────────
+
+// GET /api/orders/admin/all
+export const getAllOrders = async (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 20;
+    const status = req.query.status; // Filter by status
+    const skip = (page - 1) * limit;
+
+    const filter = status ? { orderStatus: status } : {};
+
+    const [orders, total] = await Promise.all([
+      Order.find(filter)
+        .populate("user", "name email phone")
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit),
+      Order.countDocuments(filter),
+    ]);
+
+    return successResponse(res, 200, "Orders retrieved successfully", {
+      orders,
+      pagination: {
+        total,
+        page,
+        pages: Math.ceil(total / limit),
+        limit,
+      },
+    });
+  } catch (error) {
+    return errorResponse(res, 500, error.message);
+  }
+};
+
+// PUT /api/orders/admin/:orderId/status
+export const updateOrderStatus = async (req, res) => {
+  try {
+    const { status } = req.body;
+    const validStatuses = [
+      "pending",
+      "processing",
+      "shipped",
+      "delivered",
+      "cancelled",
+    ];
+
+    if (!status) return errorResponse(res, 400, "Status is required");
+    if (!validStatuses.includes(status))
+      return errorResponse(
+        res,
+        400,
+        `Invalid status. Must be: ${validStatuses.join(", ")}`,
+      );
+
+    const order = await Order.findById(req.params.orderId);
+    if (!order) return errorResponse(res, 404, "Order not found");
+
+    // Cancelled order ka status change nahi ho sakta
+    if (order.orderStatus === "cancelled")
+      return errorResponse(res, 400, "Cancelled orders cannot be updated");
+
+    // Delivered order wapas processing/pending nahi ho sakta
+    const statusFlow = ["pending", "processing", "shipped", "delivered"];
+    const currentIndex = statusFlow.indexOf(order.orderStatus);
+    const newIndex = statusFlow.indexOf(status);
+
+    if (newIndex !== -1 && newIndex < currentIndex)
+      return errorResponse(
+        res,
+        400,
+        `Cannot move order back from ${order.orderStatus} to ${status}`,
+      );
+
+    order.orderStatus = status;
+
+    // Delivered pe timestamp
+    if (status === "delivered") {
+      order.deliveredAt = new Date();
+      order.paymentStatus = "paid"; // COD — delivered = paid
+    }
+
+    await order.save();
+
+    return successResponse(res, 200, "Order status updated", { order });
+  } catch (error) {
+    return errorResponse(res, 500, error.message);
+  }
+};
