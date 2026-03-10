@@ -297,3 +297,70 @@ export const toggleHelpful = async (req, res) => {
     return errorResponse(res, 500, error.message);
   }
 };
+
+// ─── Admin Routes ──────────────────────────────────
+
+// GET /api/reviews/admin/all
+export const getAllReviews = async (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 20;
+    const skip = (page - 1) * limit;
+    const productId = req.query.productId;
+    const hidden = req.query.hidden;
+
+    const filter = {};
+    if (productId) filter.productId = parseInt(productId);
+    if (hidden === "true") filter.isHidden = true;
+    if (hidden === "false") filter.isHidden = false;
+
+    const [reviews, total] = await Promise.all([
+      Review.find(filter)
+        .populate("user", "name email avatar")
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit),
+      Review.countDocuments(filter),
+    ]);
+
+    return successResponse(res, 200, "All reviews retrieved", {
+      reviews,
+      pagination: { total, page, pages: Math.ceil(total / limit), limit },
+    });
+  } catch (error) {
+    return errorResponse(res, 500, error.message);
+  }
+};
+
+// PUT /api/reviews/admin/:id/hide
+export const toggleHideReview = async (req, res) => {
+  try {
+    const review = await Review.findById(req.params.id);
+    if (!review) return errorResponse(res, 404, "Review not found");
+
+    review.isHidden = !review.isHidden;
+    await review.save();
+
+    return successResponse(
+      res,
+      200,
+      review.isHidden
+        ? "Review hidden successfully"
+        : "Review unhidden successfully",
+      { isHidden: review.isHidden },
+    );
+  } catch (error) {
+    return errorResponse(res, 500, error.message);
+  }
+};
+
+// DELETE /api/reviews/admin/:id
+export const adminDeleteReview = async (req, res) => {
+  try {
+    const review = await Review.findByIdAndDelete(req.params.id);
+    if (!review) return errorResponse(res, 404, "Review not found");
+    return successResponse(res, 200, "Review deleted by admin");
+  } catch (error) {
+    return errorResponse(res, 500, error.message);
+  }
+};

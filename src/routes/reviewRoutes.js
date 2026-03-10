@@ -7,8 +7,11 @@ import {
   updateReview,
   deleteReview,
   toggleHelpful,
+  getAllReviews,
+  toggleHideReview,
+  adminDeleteReview,
 } from "../controllers/reviewController.js";
-import { protect} from "../middlewares/authMiddleware.js";
+import { adminOnly, protect} from "../middlewares/authMiddleware.js";
 
 const router = express.Router();
 
@@ -24,5 +27,11 @@ router.post("/", createReview);
 router.put("/:id", updateReview);
 router.delete("/:id", deleteReview);
 router.post("/:id/helpful", toggleHelpful);
+
+// ─── Admin Routes ─────────────────────────────────
+router.get("/admin/all", adminOnly, getAllReviews);
+router.put("/admin/:id/hide", adminOnly, toggleHideReview);
+router.delete("/admin/:id", adminOnly, adminDeleteReview);
+
 
 export default router;
