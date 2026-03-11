@@ -1,21 +1,20 @@
 import mongoose from "mongoose";
 import bcrypt from "bcryptjs";
 
-// ─── Saved Address Schema (Google Maps se aayega) ─
 const savedAddressSchema = new mongoose.Schema(
   {
-    formatted: { type: String }, // "Model Town, Lahore, Punjab, Pakistan"
+    formatted: { type: String },
     street: { type: String },
     city: { type: String },
     state: { type: String },
     country: { type: String },
     postalCode: { type: String },
-    lat: { type: Number }, // For delivery tracking
+    lat: { type: Number },
     lng: { type: Number },
-    placeId: { type: String }, // Google's unique Place ID
+    placeId: { type: String },
   },
   { _id: false },
-); // No need for a separate ID
+);
 
 const userSchema = new mongoose.Schema(
   {
@@ -42,15 +41,8 @@ const userSchema = new mongoose.Schema(
     googleId: { type: String, sparse: true },
     facebookId: { type: String, sparse: true },
 
-    // ─── Email Verification ──────────────────────
+    // ─── Email Verified ──────────────────────────
     isEmailVerified: { type: Boolean, default: false },
-    emailOTP: { type: String, select: false },
-    emailOTPExpiry: { type: Date, select: false },
-    otpResendAt: { type: Date },
-
-    // ─── Password Reset ──────────────────────────
-    passwordResetOTP: { type: String, select: false },
-    passwordResetExpiry: { type: Date, select: false },
 
     // ─── Security ────────────────────────────────
     loginAttempts: { type: Number, default: 0 },
@@ -59,13 +51,8 @@ const userSchema = new mongoose.Schema(
     lastLogin: { type: Date },
     isActive: { type: Boolean, default: true },
 
-    // ─── Saved Address (Google Maps) ─────────────
-    // Single address — verified via Google Maps API
-    // Automatically populated at checkout; no manual typing required
-    savedAddress: {
-      type: savedAddressSchema,
-      default: null,
-    },
+    // ─── Saved Address ────────────────────────────
+    savedAddress: { type: savedAddressSchema, default: null },
   },
   { timestamps: true },
 );
@@ -87,15 +74,11 @@ userSchema.methods.isLocked = function () {
   return this.lockUntil && this.lockUntil > Date.now();
 };
 
-// ─── Safe Object  ──────
+// ─── Safe Object ─────────────────────────────────
 userSchema.methods.toSafeObject = function () {
   const obj = this.toObject();
   delete obj.password;
   delete obj.refreshToken;
-  delete obj.emailOTP;
-  delete obj.emailOTPExpiry;
-  delete obj.passwordResetOTP;
-  delete obj.passwordResetExpiry;
   delete obj.loginAttempts;
   delete obj.lockUntil;
   return obj;
