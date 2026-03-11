@@ -7,6 +7,7 @@ import {
   removeAvatar,
   getAddress,
   saveAddress,
+  deleteAccount,
 } from "../controllers/userController.js";
 import { protect } from "../middlewares/authMiddleware.js";
 import {
@@ -31,5 +32,9 @@ router.delete("/avatar", removeAvatar);
 // ─── Address (Google Maps) ────────────────────────
 router.get("/address", getAddress);
 router.put("/address", saveAddress);
+
+// ─── Delete Account ───────────────────────────────
+router.delete("/profile", deleteAccount);
+
 
 export default router;

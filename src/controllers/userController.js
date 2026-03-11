@@ -1,4 +1,7 @@
 import User from "../models/User.js";
+import Cart from "../models/Cart.js";
+import Favorite from "../models/Favorite.js";
+import Review from "../models/Review.js";
 import { successResponse, errorResponse } from "../utils/apiResponse.js";
 import {
   uploadAvatarToCloudinary,
@@ -236,6 +239,59 @@ export const saveAddress = async (req, res) => {
     return successResponse(res, 200, "Address saved successfully", {
       savedAddress: user.savedAddress,
     });
+  } catch (error) {
+    return errorResponse(res, 500, error.message);
+  }
+};
+// DELETE /api/users/profile
+export const deleteAccount = async (req, res) => {
+  try {
+    const { password } = req.body;
+
+    if (!password)
+      return errorResponse(
+        res,
+        400,
+        "Password is required to delete your account",
+      );
+
+    const user = await User.findById(req.user._id).select("+password");
+    if (!user) return errorResponse(res, 404, "User not found");
+
+    // Social login users ke liye password check skip
+    if (user.password) {
+      const isMatch = await user.comparePassword(password);
+      if (!isMatch) return errorResponse(res, 400, "Incorrect password");
+    }
+
+    // Avatar Cloudinary se delete karo
+    if (user.avatar) {
+      try {
+        await deleteAvatarFromCloudinary(user._id);
+      } catch {
+        // Avatar delete fail — chalte rahte hain
+      }
+    }
+
+    // Sab data delete karo
+    await Promise.all([
+      Cart.findOneAndDelete({ user: user._id }),
+      Favorite.findOneAndDelete({ user: user._id }),
+      Review.deleteMany({ user: user._id }),
+    ]);
+
+    // Account delete
+    await user.deleteOne();
+
+    // Cookies clear
+    res.clearCookie("accessToken");
+    res.clearCookie("refreshToken");
+
+    return successResponse(
+      res,
+      200,
+      "Your account has been deleted successfully",
+    );
   } catch (error) {
     return errorResponse(res, 500, error.message);
   }
