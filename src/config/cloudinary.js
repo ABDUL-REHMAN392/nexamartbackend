@@ -12,12 +12,12 @@ export const uploadAvatarToCloudinary = (fileBuffer, userId) => {
   return new Promise((resolve, reject) => {
     const uploadStream = cloudinary.uploader.upload_stream(
       {
-        folder: `nexamart/avatars`, // Organized folder structure
+        folder: `nexamart/avatars`,
         public_id: `user_${userId}`, // userId se naam — purana auto replace
-        overwrite: true, // Same public_id → purana replace ho jaye
+        overwrite: true,
         transformation: [
-          { width: 300, height: 300, crop: "fill", gravity: "face" }, // Face detect + crop
-          { quality: "auto", fetch_format: "auto" }, // Auto optimize
+          { width: 300, height: 300, crop: "fill", gravity: "face" },
+          { quality: "auto", fetch_format: "auto" },
         ],
       },
       (error, result) => {
@@ -26,17 +26,20 @@ export const uploadAvatarToCloudinary = (fileBuffer, userId) => {
       },
     );
 
-    uploadStream.end(fileBuffer); // Memory buffer seedha stream mein
+    uploadStream.end(fileBuffer);
   });
 };
 
 // ─── Avatar Delete ────────────────────────────────
 export const deleteAvatarFromCloudinary = async (userId) => {
   try {
-    await cloudinary.uploader.destroy(`nexamart/avatars/user_${userId}`);
+    const result = await cloudinary.uploader.destroy(
+      `nexamart/avatars/user_${userId}`,
+    );
+    return result.result === "ok";
   } catch (error) {
-    // Delete fail ho to koi baat nahi — log karo bas
     console.error("Cloudinary delete error:", error.message);
+    return false;
   }
 };
 

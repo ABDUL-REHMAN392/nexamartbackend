@@ -3,39 +3,43 @@ import { successResponse, errorResponse } from "../utils/apiResponse.js";
 
 const FAVORITES_LIMIT = 100;
 
-// GET /api/favorites
+// ─── Helper: productId validate + parse ──────────────────────────────────────
+const parseProductId = (raw) => {
+  const id = Number(raw);
+  return Number.isInteger(id) && id > 0 ? id : null;
+};
+
+// ─── GET /api/favorites ───────────────────────────────────────────────────────
 export const getFavorites = async (req, res) => {
   try {
-    const favorites = await Favorite.find({ user: req.user._id }).sort({
-      createdAt: -1,
-    }); // Latest pehle
+    const favorites = await Favorite.find({ user: req.user._id })
+      .sort({ createdAt: -1 })
+      .lean(); // plain JS objects — faster
 
     return successResponse(res, 200, "Favorites retrieved successfully", {
       favorites,
       total: favorites.length,
     });
   } catch (error) {
-    return errorResponse(res, 500, error.message);
+    console.error("[getFavorites]", error);
+    return errorResponse(res, 500, "Something went wrong. Please try again.");
   }
 };
 
-// POST /api/favorites
+// ─── POST /api/favorites ──────────────────────────────────────────────────────
 export const addFavorite = async (req, res) => {
   try {
     const { productId, title, price, image, brand, category, rating } =
       req.body;
 
-    // Validations
-    if (!productId) return errorResponse(res, 400, "Product ID is required");
-    if (typeof productId !== "number" || productId <= 0)
-      return errorResponse(res, 400, "Invalid product ID");
-    if (!title || !title.trim())
+    // Validate required fields
+    const pid = parseProductId(productId);
+    if (!pid) return errorResponse(res, 400, "Invalid or missing product ID");
+    if (!title?.trim())
       return errorResponse(res, 400, "Product title is required");
-    if (price === undefined || price === null)
-      return errorResponse(res, 400, "Product price is required");
-    if (typeof price !== "number" || price < 0)
+    if (price == null || typeof price !== "number" || price < 0)
       return errorResponse(res, 400, "Invalid product price");
-    if (!image || !image.trim())
+    if (!image?.trim())
       return errorResponse(res, 400, "Product image is required");
 
     // Limit check
@@ -44,130 +48,122 @@ export const addFavorite = async (req, res) => {
       return errorResponse(
         res,
         400,
-        `You can only save up to ${FAVORITES_LIMIT} favorites`,
+        `Favorites limit reached (${FAVORITES_LIMIT})`,
       );
 
-    // Already favorited?
-    const existing = await Favorite.findOne({
+    // Duplicate check
+    const exists = await Favorite.findOne({
       user: req.user._id,
-      productId,
+      productId: pid,
     });
-    if (existing)
-      return errorResponse(res, 400, "Product is already in your favorites");
+    if (exists)
+      return errorResponse(res, 409, "Product is already in your favorites");
 
     const favorite = await Favorite.create({
       user: req.user._id,
-      productId,
+      productId: pid,
       title: title.trim(),
       price,
       image: image.trim(),
       brand: brand?.trim() || "",
       category: category?.trim() || "",
-      rating: rating || 0,
+      rating: typeof rating === "number" ? rating : 0,
     });
 
     return successResponse(res, 201, "Added to favorites", { favorite });
   } catch (error) {
-    // Duplicate key — race condition handle
     if (error.code === 11000)
-      return errorResponse(res, 400, "Product is already in your favorites");
-    return errorResponse(res, 500, error.message);
+      return errorResponse(res, 409, "Product is already in your favorites");
+    console.error("[addFavorite]", error);
+    return errorResponse(res, 500, "Something went wrong. Please try again.");
   }
 };
 
-// DELETE /api/favorites/:productId
+// ─── DELETE /api/favorites/:productId ────────────────────────────────────────
 export const removeFavorite = async (req, res) => {
   try {
-    const productId = parseInt(req.params.productId);
+    const pid = parseProductId(req.params.productId);
+    if (!pid) return errorResponse(res, 400, "Invalid product ID");
 
-    if (isNaN(productId) || productId <= 0)
-      return errorResponse(res, 400, "Invalid product ID");
-
-    const favorite = await Favorite.findOneAndDelete({
+    const deleted = await Favorite.findOneAndDelete({
       user: req.user._id,
-      productId,
+      productId: pid,
     });
 
-    if (!favorite)
+    if (!deleted)
       return errorResponse(res, 404, "Product not found in your favorites");
 
     return successResponse(res, 200, "Removed from favorites");
   } catch (error) {
-    return errorResponse(res, 500, error.message);
+    console.error("[removeFavorite]", error);
+    return errorResponse(res, 500, "Something went wrong. Please try again.");
   }
 };
 
-// GET /api/favorites/:productId/check
+// ─── GET /api/favorites/:productId/check ─────────────────────────────────────
 export const checkFavorite = async (req, res) => {
   try {
-    const productId = parseInt(req.params.productId);
+    const pid = parseProductId(req.params.productId);
+    if (!pid) return errorResponse(res, 400, "Invalid product ID");
 
-    if (isNaN(productId) || productId <= 0)
-      return errorResponse(res, 400, "Invalid product ID");
-
-    const favorite = await Favorite.findOne({
+    const exists = await Favorite.exists({
       user: req.user._id,
-      productId,
+      productId: pid,
     });
 
-    return successResponse(res, 200, "Checked", {
-      isFavorited: !!favorite,
-    });
+    return successResponse(res, 200, "Checked", { isFavorited: !!exists });
   } catch (error) {
-    return errorResponse(res, 500, error.message);
+    console.error("[checkFavorite]", error);
+    return errorResponse(res, 500, "Something went wrong. Please try again.");
   }
 };
 
-// POST /api/favorites/toggle
+// ─── POST /api/favorites/toggle ──────────────────────────────────────────────
 export const toggleFavorite = async (req, res) => {
   try {
     const { productId, title, price, image, brand, category, rating } =
       req.body;
 
-    if (!productId) return errorResponse(res, 400, "Product ID is required");
-    if (typeof productId !== "number" || productId <= 0)
-      return errorResponse(res, 400, "Invalid product ID");
+    const pid = parseProductId(productId);
+    if (!pid) return errorResponse(res, 400, "Invalid or missing product ID");
 
-    // Pehle se hai?
+    // Already favorited → remove
     const existing = await Favorite.findOne({
       user: req.user._id,
-      productId,
+      productId: pid,
     });
-
     if (existing) {
-      // Remove karo
       await existing.deleteOne();
       return successResponse(res, 200, "Removed from favorites", {
         isFavorited: false,
       });
     }
 
-    // Add karo — validations
-    if (!title || !title.trim())
+    // Not favorited → validate then add
+    if (!title?.trim())
       return errorResponse(res, 400, "Product title is required");
-    if (price === undefined || price === null)
-      return errorResponse(res, 400, "Product price is required");
-    if (!image || !image.trim())
+    if (price == null || typeof price !== "number" || price < 0)
+      return errorResponse(res, 400, "Invalid product price");
+    if (!image?.trim())
       return errorResponse(res, 400, "Product image is required");
 
-    // Limit check
     const count = await Favorite.countDocuments({ user: req.user._id });
     if (count >= FAVORITES_LIMIT)
       return errorResponse(
         res,
         400,
-        `You can only save up to ${FAVORITES_LIMIT} favorites`,
+        `Favorites limit reached (${FAVORITES_LIMIT})`,
       );
 
     const favorite = await Favorite.create({
       user: req.user._id,
-      productId,
+      productId: pid,
       title: title.trim(),
       price,
       image: image.trim(),
       brand: brand?.trim() || "",
       category: category?.trim() || "",
-      rating: rating || 0,
+      rating: typeof rating === "number" ? rating : 0,
     });
 
     return successResponse(res, 201, "Added to favorites", {
@@ -176,12 +172,13 @@ export const toggleFavorite = async (req, res) => {
     });
   } catch (error) {
     if (error.code === 11000)
-      return errorResponse(res, 400, "Product is already in your favorites");
-    return errorResponse(res, 500, error.message);
+      return errorResponse(res, 409, "Product is already in your favorites");
+    console.error("[toggleFavorite]", error);
+    return errorResponse(res, 500, "Something went wrong. Please try again.");
   }
 };
 
-// DELETE /api/favorites
+// ─── DELETE /api/favorites ────────────────────────────────────────────────────
 export const clearFavorites = async (req, res) => {
   try {
     const result = await Favorite.deleteMany({ user: req.user._id });
@@ -193,6 +190,7 @@ export const clearFavorites = async (req, res) => {
       removed: result.deletedCount,
     });
   } catch (error) {
-    return errorResponse(res, 500, error.message);
+    console.error("[clearFavorites]", error);
+    return errorResponse(res, 500, "Something went wrong. Please try again.");
   }
 };

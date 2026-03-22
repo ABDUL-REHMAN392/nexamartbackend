@@ -15,28 +15,33 @@ passport.use(
       try {
         const email = profile.emails?.[0]?.value;
         const avatar = profile.photos?.[0]?.value;
+        const name = profile.displayName;
 
         let user = await User.findOne({ email });
 
-        if (user) {
-          // Email exist karti hai — Google ID link karo
+        if (!user) {
+          // New user — create fresh
+          user = await User.create({
+            name,
+            email,
+            googleId: profile.id,
+            avatar,
+            isEmailVerified: true,
+            password: null,
+          });
+        } else {
+          // Existing user — only patch missing fields
+          let changed = false;
           if (!user.googleId) {
             user.googleId = profile.id;
-            if (!user.avatar && avatar) user.avatar = avatar;
-            await user.save();
+            changed = true;
           }
-          return done(null, user);
+          if (!user.avatar && avatar) {
+            user.avatar = avatar;
+            changed = true;
+          }
+          if (changed) await user.save();
         }
-
-        // Naya user
-        user = await User.create({
-          name: profile.displayName,
-          email,
-          googleId: profile.id,
-          avatar,
-          isEmailVerified: true, // Google ne already verify ki
-          password: null,
-        });
 
         return done(null, user);
       } catch (error) {
@@ -59,41 +64,48 @@ passport.use(
       try {
         const email = profile.emails?.[0]?.value;
         const avatar = profile.photos?.[0]?.value;
+        const name = profile.displayName;
 
-        // Facebook kabhi kabhi email nahi deta
+        let user;
+
         if (!email) {
-          let user = await User.findOne({ facebookId: profile.id });
-          if (user) return done(null, user);
-
-          user = await User.create({
-            name: profile.displayName,
-            facebookId: profile.id,
-            avatar,
-            isEmailVerified: false,
-            password: null,
-          });
-          return done(null, user);
-        }
-
-        let user = await User.findOne({ email });
-
-        if (user) {
-          if (!user.facebookId) {
-            user.facebookId = profile.id;
-            if (!user.avatar && avatar) user.avatar = avatar;
-            await user.save();
+          // No email — find or create by facebookId only
+          user = await User.findOne({ facebookId: profile.id });
+          if (!user) {
+            user = await User.create({
+              name,
+              facebookId: profile.id,
+              avatar,
+              isEmailVerified: false,
+              password: null,
+            });
           }
           return done(null, user);
         }
 
-        user = await User.create({
-          name: profile.displayName,
-          email,
-          facebookId: profile.id,
-          avatar,
-          isEmailVerified: true,
-          password: null,
-        });
+        user = await User.findOne({ email });
+
+        if (!user) {
+          user = await User.create({
+            name,
+            email,
+            facebookId: profile.id,
+            avatar,
+            isEmailVerified: true,
+            password: null,
+          });
+        } else {
+          let changed = false;
+          if (!user.facebookId) {
+            user.facebookId = profile.id;
+            changed = true;
+          }
+          if (!user.avatar && avatar) {
+            user.avatar = avatar;
+            changed = true;
+          }
+          if (changed) await user.save();
+        }
 
         return done(null, user);
       } catch (error) {
@@ -102,5 +114,4 @@ passport.use(
     },
   ),
 );
-
 export default passport;

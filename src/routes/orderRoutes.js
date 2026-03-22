@@ -7,22 +7,20 @@ import {
   getAllOrders,
   updateOrderStatus,
 } from "../controllers/orderController.js";
-import { adminOnly, protect } from "../middlewares/authMiddleware.js";
-import { createPaymentIntent } from "../controllers/stripeController.js";
+import { adminOnly, protect, customerOnly } from "../middlewares/authMiddleware.js";
 
 const router = express.Router();
 
 // ─── Customer Routes ──────────────────────────────
 router.use(protect);
 
-router.get("/", getMyOrders);
-router.post("/", placeOrder);
-router.post("/create-payment-intent",  createPaymentIntent);   // Stripe — payment intent
-router.get("/:orderId", getOrderById);
-router.put("/:orderId/cancel", cancelOrder);
+router.get("/",              customerOnly, getMyOrders);
+router.post("/",             customerOnly, placeOrder);
+router.get("/:orderId",      customerOnly, getOrderById);
+router.put("/:orderId/cancel", customerOnly, cancelOrder);
 
 // ─── Admin Routes ─────────────────────────────────
-router.get("/admin/all", adminOnly, getAllOrders);
-router.put("/admin/:orderId/status", adminOnly, updateOrderStatus);
+router.get("/admin/all",              adminOnly, getAllOrders);
+router.put("/admin/:orderId/status",  adminOnly, updateOrderStatus);
 
 export default router;

@@ -47,13 +47,13 @@ export const adminOnly = (req, res, next) => {
   next();
 };
 
-// ─── Email Verified ───────────────────────────────
-export const emailVerified = (req, res, next) => {
-  if (!req.user?.isEmailVerified) {
+// ─── Customer Only ────────────────────────────────
+export const customerOnly = (req, res, next) => {
+  if (req.user?.role === "admin") {
     return errorResponse(
       res,
       403,
-      "Please verify your email before continuing",
+      "Admins cannot perform customer actions (cart, favorites, orders)",
     );
   }
   next();

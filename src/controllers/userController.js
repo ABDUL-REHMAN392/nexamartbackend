@@ -51,7 +51,7 @@ export const updateProfile = async (req, res) => {
         ...(name && { name: name.trim() }),
         ...(phone && { phone: phone.trim() }),
       },
-      { new: true, runValidators: true },
+      { returnDocument: "after", runValidators: true },
     );
     if (!user) return errorResponse(res, 404, "User not found");
 
@@ -137,7 +137,7 @@ export const uploadAvatar = async (req, res) => {
     const user = await User.findByIdAndUpdate(
       userId,
       { avatar: result.secure_url },
-      { new: true },
+      { returnDocument: "after" },
     );
     if (!user) return errorResponse(res, 404, "User not found");
 
@@ -208,11 +208,21 @@ export const saveAddress = async (req, res) => {
       return errorResponse(res, 400, "City is required");
     if (!country || !country.trim())
       return errorResponse(res, 400, "Country is required");
-    if (lat !== undefined && (typeof lat !== "number" || lat < -90 || lat > 90))
+    // lat/lng — frontend mein Google Maps nahi hai, string ya undefined aata hai
+    // Sirf valid numbers accept karo, baaki ignore karo
+    const parsedLat =
+      lat !== undefined && lat !== "" && lat !== null ? parseFloat(lat) : null;
+    const parsedLng =
+      lng !== undefined && lng !== "" && lng !== null ? parseFloat(lng) : null;
+
+    if (
+      parsedLat !== null &&
+      (isNaN(parsedLat) || parsedLat < -90 || parsedLat > 90)
+    )
       return errorResponse(res, 400, "Invalid latitude value");
     if (
-      lng !== undefined &&
-      (typeof lng !== "number" || lng < -180 || lng > 180)
+      parsedLng !== null &&
+      (isNaN(parsedLng) || parsedLng < -180 || parsedLng > 180)
     )
       return errorResponse(res, 400, "Invalid longitude value");
 
@@ -226,12 +236,12 @@ export const saveAddress = async (req, res) => {
           state: state?.trim() || "",
           country: country.trim(),
           postalCode: postalCode?.trim() || "",
-          lat: lat || null,
-          lng: lng || null,
+          lat: parsedLat,
+          lng: parsedLng,
           placeId: placeId?.trim() || "",
         },
       },
-      { new: true },
+      { returnDocument: "after" },
     );
 
     if (!user) return errorResponse(res, 404, "User not found");

@@ -2,15 +2,28 @@ import Order from "../models/Order.js";
 import Cart from "../models/Cart.js";
 import User from "../models/User.js";
 import { successResponse, errorResponse } from "../utils/apiResponse.js";
+import {
+  emitNewOrder,
+  emitOrderStatusUpdate,
+  emitOrderCancelledByAdmin,
+  emitOrderPlaced,
+} from "../config/socket.js";
 
-const DELIVERY_FEE = 150; // Rs. 150 flat
-const FREE_DELIVERY = 2000; // Rs. 2000 se upar free delivery
+// ── Delivery tiers (USD) ──────────────────────────
+const DELIVERY_TIERS = [
+  { maxKg: 0.5, fee: 2.99 },
+  { maxKg: 2, fee: 5.99 },
+  { maxKg: 5, fee: 9.99 },
+  { maxKg: Infinity, fee: 14.99 },
+];
+function calcDeliveryFee(totalWeightKg) {
+  const tier = DELIVERY_TIERS.find((t) => totalWeightKg <= t.maxKg);
+  return tier ? tier.fee : DELIVERY_TIERS[DELIVERY_TIERS.length - 1].fee;
+}
 
-// ─── Cancellable statuses ─────────────────────────
 const CANCELLABLE = ["pending", "processing"];
 
 // GET /api/orders
-
 export const getMyOrders = async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
@@ -27,12 +40,7 @@ export const getMyOrders = async (req, res) => {
 
     return successResponse(res, 200, "Orders retrieved successfully", {
       orders,
-      pagination: {
-        total,
-        page,
-        pages: Math.ceil(total / limit),
-        limit,
-      },
+      pagination: { total, page, pages: Math.ceil(total / limit), limit },
     });
   } catch (error) {
     return errorResponse(res, 500, error.message);
@@ -44,61 +52,42 @@ export const getOrderById = async (req, res) => {
   try {
     const order = await Order.findOne({
       _id: req.params.orderId,
-      user: req.user._id, // Sirf apna order dekh sake
+      user: req.user._id,
     });
-
     if (!order) return errorResponse(res, 404, "Order not found");
-
     return successResponse(res, 200, "Order retrieved successfully", { order });
   } catch (error) {
     return errorResponse(res, 500, error.message);
   }
 };
 
-// POST /api/orders
+// POST /api/orders — COD with weight-based delivery
 export const placeOrder = async (req, res) => {
   try {
-    const { paymentMethod } = req.body;
-
-    // ── Validations ────────────────────────────────
-    if (!paymentMethod)
-      return errorResponse(res, 400, "Payment method is required");
-    if (!["cod", "stripe"].includes(paymentMethod))
-      return errorResponse(res, 400, "Payment method must be cod or stripe");
-
-    // Stripe abhi available nahi
-    if (paymentMethod === "stripe")
-      return errorResponse(
-        res,
-        400,
-        "Stripe payments coming soon! Please use COD for now",
-      );
-
-    // ── Cart Check ─────────────────────────────────
     const cart = await Cart.findOne({ user: req.user._id });
     if (!cart || cart.items.length === 0)
       return errorResponse(res, 400, "Your cart is empty");
 
-    // ── Address Check ──────────────────────────────
     const user = await User.findById(req.user._id);
-    if (!user.savedAddress || !user.savedAddress.city)
+    if (!user.savedAddress?.city)
       return errorResponse(
         res,
         400,
         "Please add a delivery address before placing an order",
       );
 
-    // ── Price Calculate ────────────────────────────
-    const itemsTotal = parseFloat(
+    const totalWeightKg = parseFloat(
       cart.items
-        .reduce((sum, item) => sum + item.price * item.quantity, 0)
-        .toFixed(2),
+        .reduce((sum, i) => sum + (i.weight || 0) * i.quantity, 0)
+        .toFixed(3),
     );
 
-    const deliveryFee = itemsTotal >= FREE_DELIVERY ? 0 : DELIVERY_FEE;
+    const itemsTotal = parseFloat(
+      cart.items.reduce((s, i) => s + i.price * i.quantity, 0).toFixed(2),
+    );
+    const deliveryFee = parseFloat(calcDeliveryFee(totalWeightKg).toFixed(2));
     const totalAmount = parseFloat((itemsTotal + deliveryFee).toFixed(2));
 
-    // ── Items Snapshot ─────────────────────────────
     const orderItems = cart.items.map((item) => ({
       productId: item.productId,
       title: item.title,
@@ -106,11 +95,11 @@ export const placeOrder = async (req, res) => {
       image: item.image,
       brand: item.brand,
       category: item.category,
+      weight: item.weight || 0,
       quantity: item.quantity,
       subtotal: parseFloat((item.price * item.quantity).toFixed(2)),
     }));
 
-    // ── Address Snapshot ───────────────────────────
     const deliveryAddress = {
       formatted: user.savedAddress.formatted,
       street: user.savedAddress.street || "",
@@ -118,27 +107,29 @@ export const placeOrder = async (req, res) => {
       state: user.savedAddress.state || "",
       country: user.savedAddress.country,
       postalCode: user.savedAddress.postalCode || "",
-      lat: user.savedAddress.lat || null,
-      lng: user.savedAddress.lng || null,
     };
 
-    // ── Order Create ───────────────────────────────
     const order = await Order.create({
       user: req.user._id,
       items: orderItems,
       deliveryAddress,
       itemsTotal,
       deliveryFee,
+      totalWeightKg,
       discount: 0,
       totalAmount,
-      paymentMethod,
+      paymentMethod: "cod",
       paymentStatus: "pending",
       orderStatus: "pending",
     });
 
-    // ── Cart Clear ─────────────────────────────────
     cart.items = [];
     await cart.save();
+
+    // Admin ko new order notify karo
+    await emitNewOrder({ ...order.toObject(), user: { name: user.name } });
+    // Customer ko order placed confirmation
+    await emitOrderPlaced(order);
 
     return successResponse(res, 201, "Order placed successfully!", { order });
   } catch (error) {
@@ -155,10 +146,8 @@ export const cancelOrder = async (req, res) => {
       _id: req.params.orderId,
       user: req.user._id,
     });
-
     if (!order) return errorResponse(res, 404, "Order not found");
 
-    // Cancel sirf pending/processing pe
     if (!CANCELLABLE.includes(order.orderStatus))
       return errorResponse(
         res,
@@ -169,27 +158,46 @@ export const cancelOrder = async (req, res) => {
     order.orderStatus = "cancelled";
     order.cancelledAt = new Date();
     order.cancellationReason = reason?.trim() || "Cancelled by customer";
+    order.paymentStatus = "failed";
 
     await order.save();
+
+    // Admin ko notify karo — socket + DB notification
+    await emitOrderStatusUpdate(order);
 
     return successResponse(res, 200, "Order cancelled successfully", { order });
   } catch (error) {
     return errorResponse(res, 500, error.message);
   }
 };
-// ─────────────────────────────────────────────────
-// ADMIN ROUTES
-// ─────────────────────────────────────────────────
+
+// ─── ADMIN ROUTES ─────────────────────────────────
 
 // GET /api/orders/admin/all
 export const getAllOrders = async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 20;
-    const status = req.query.status; // Filter by status
+    const status = req.query.status;
+    const search = req.query.search?.trim();
     const skip = (page - 1) * limit;
 
-    const filter = status ? { orderStatus: status } : {};
+    const filter = {};
+    if (status) filter.orderStatus = status;
+
+    if (search) {
+      const users = await User.find({
+        $or: [
+          { name: { $regex: search, $options: "i" } },
+          { email: { $regex: search, $options: "i" } },
+        ],
+      }).select("_id");
+      const userIds = users.map((u) => u._id);
+      filter.$or = [
+        { user: { $in: userIds } },
+        { orderNumber: { $regex: search, $options: "i" } },
+      ];
+    }
 
     const [orders, total] = await Promise.all([
       Order.find(filter)
@@ -202,12 +210,7 @@ export const getAllOrders = async (req, res) => {
 
     return successResponse(res, 200, "Orders retrieved successfully", {
       orders,
-      pagination: {
-        total,
-        page,
-        pages: Math.ceil(total / limit),
-        limit,
-      },
+      pagination: { total, page, pages: Math.ceil(total / limit), limit },
     });
   } catch (error) {
     return errorResponse(res, 500, error.message);
@@ -217,7 +220,7 @@ export const getAllOrders = async (req, res) => {
 // PUT /api/orders/admin/:orderId/status
 export const updateOrderStatus = async (req, res) => {
   try {
-    const { status } = req.body;
+    const { status, reason } = req.body;
     const validStatuses = [
       "pending",
       "processing",
@@ -237,11 +240,37 @@ export const updateOrderStatus = async (req, res) => {
     const order = await Order.findById(req.params.orderId);
     if (!order) return errorResponse(res, 404, "Order not found");
 
-    // Cancelled order ka status change nahi ho sakta
     if (order.orderStatus === "cancelled")
       return errorResponse(res, 400, "Cancelled orders cannot be updated");
 
-    // Delivered order wapas processing/pending nahi ho sakta
+    // ── Admin Cancel ──────────────────────────────
+    if (status === "cancelled") {
+      order.orderStatus = "cancelled";
+      order.cancelledAt = new Date();
+      order.cancellationReason = reason?.trim() || "Cancelled by admin";
+      order.paymentStatus =
+        order.paymentStatus === "paid" ? "refunded" : "failed";
+
+      await order.save();
+
+      const refundInfo =
+        order.paymentStatus === "refunded"
+          ? {
+              message:
+                "COD order was already paid — cash refund to be handled manually.",
+            }
+          : null;
+
+      // Customer ko notify karo — socket + DB notification
+      await emitOrderCancelledByAdmin(order, refundInfo);
+
+      return successResponse(res, 200, "Order cancelled by admin", {
+        order,
+        refund: refundInfo,
+      });
+    }
+
+    // ── Normal Status Flow ─────────────────────────
     const statusFlow = ["pending", "processing", "shipped", "delivered"];
     const currentIndex = statusFlow.indexOf(order.orderStatus);
     const newIndex = statusFlow.indexOf(status);
@@ -255,13 +284,15 @@ export const updateOrderStatus = async (req, res) => {
 
     order.orderStatus = status;
 
-    // Delivered pe timestamp
     if (status === "delivered") {
       order.deliveredAt = new Date();
-      order.paymentStatus = "paid"; // COD — delivered = paid
+      order.paymentStatus = "paid";
     }
 
     await order.save();
+
+    // Customer + admin ko notify karo
+    await emitOrderStatusUpdate(order);
 
     return successResponse(res, 200, "Order status updated", { order });
   } catch (error) {

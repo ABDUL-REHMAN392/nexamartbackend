@@ -73,7 +73,8 @@ export const createReview = async (req, res) => {
   } catch (error) {
     if (error.code === 11000)
       return errorResponse(res, 400, "You have already reviewed this product");
-    return errorResponse(res, 500, error.message);
+    console.error("controller error:", error);
+    return errorResponse(res, 500, "Something went wrong. Please try again.");
   }
 };
 
@@ -157,7 +158,8 @@ export const getProductReviews = async (req, res) => {
       },
     });
   } catch (error) {
-    return errorResponse(res, 500, error.message);
+    console.error("controller error:", error);
+    return errorResponse(res, 500, "Something went wrong. Please try again.");
   }
 };
 
@@ -186,7 +188,8 @@ export const getMyReviews = async (req, res) => {
       },
     });
   } catch (error) {
-    return errorResponse(res, 500, error.message);
+    console.error("controller error:", error);
+    return errorResponse(res, 500, "Something went wrong. Please try again.");
   }
 };
 
@@ -203,7 +206,8 @@ export const checkMyReview = async (req, res) => {
       review: review || null,
     });
   } catch (error) {
-    return errorResponse(res, 500, error.message);
+    console.error("controller error:", error);
+    return errorResponse(res, 500, "Something went wrong. Please try again.");
   }
 };
 
@@ -244,7 +248,8 @@ export const updateReview = async (req, res) => {
 
     return successResponse(res, 200, "Review updated successfully", { review });
   } catch (error) {
-    return errorResponse(res, 500, error.message);
+    console.error("controller error:", error);
+    return errorResponse(res, 500, "Something went wrong. Please try again.");
   }
 };
 
@@ -260,7 +265,8 @@ export const deleteReview = async (req, res) => {
     await review.deleteOne();
     return successResponse(res, 200, "Review deleted successfully");
   } catch (error) {
-    return errorResponse(res, 500, error.message);
+    console.error("controller error:", error);
+    return errorResponse(res, 500, "Something went wrong. Please try again.");
   }
 };
 
@@ -294,7 +300,8 @@ export const toggleHelpful = async (req, res) => {
       },
     );
   } catch (error) {
-    return errorResponse(res, 500, error.message);
+    console.error("controller error:", error);
+    return errorResponse(res, 500, "Something went wrong. Please try again.");
   }
 };
 
@@ -328,7 +335,8 @@ export const getAllReviews = async (req, res) => {
       pagination: { total, page, pages: Math.ceil(total / limit), limit },
     });
   } catch (error) {
-    return errorResponse(res, 500, error.message);
+    console.error("controller error:", error);
+    return errorResponse(res, 500, "Something went wrong. Please try again.");
   }
 };
 
@@ -350,7 +358,8 @@ export const toggleHideReview = async (req, res) => {
       { isHidden: review.isHidden },
     );
   } catch (error) {
-    return errorResponse(res, 500, error.message);
+    console.error("controller error:", error);
+    return errorResponse(res, 500, "Something went wrong. Please try again.");
   }
 };
 
@@ -361,6 +370,7 @@ export const adminDeleteReview = async (req, res) => {
     if (!review) return errorResponse(res, 404, "Review not found");
     return successResponse(res, 200, "Review deleted by admin");
   } catch (error) {
-    return errorResponse(res, 500, error.message);
+    console.error("controller error:", error);
+    return errorResponse(res, 500, "Something went wrong. Please try again.");
   }
 };

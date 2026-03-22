@@ -7,19 +7,19 @@ import {
   clearCart,
   mergeCart,
 } from "../controllers/cartController.js";
-import { protect } from "../middlewares/authMiddleware.js";
+import { protect, customerOnly } from "../middlewares/authMiddleware.js";
 
 const router = express.Router();
 
-// Sab routes protected
-router.use(protect);
+// only for logged-in customers — admin block
+router.use(protect, customerOnly);
 
 // ─── Cart Routes ──────────────────────────────────
-router.get("/",getCart);         // Cart lo
-router.post("/",addToCart);       // Item add
-router.post("/merge",mergeCart);       // Guest cart merge ← login ke baad
-router.put("/:productId",updateQuantity);  // Quantity update
-router.delete("/",clearCart);       // Poora clear
-router.delete("/:productId",removeFromCart);  // Ek item remove
+router.get("/",getCart);         
+router.post("/",addToCart);      
+router.post("/merge",mergeCart);       // Guest cart merge 
+router.put("/:productId",updateQuantity);  
+router.delete("/",clearCart);      
+router.delete("/:productId",removeFromCart); 
 
 export default router;

@@ -46,7 +46,7 @@ export const register = async (req, res) => {
       email: email.trim().toLowerCase(),
       password,
       phone,
-      isEmailVerified: true, // No OTP — seedha verified
+      isEmailVerified: true,
     });
 
     const accessToken = generateAccessToken(user._id);
@@ -68,7 +68,8 @@ export const register = async (req, res) => {
       },
     );
   } catch (error) {
-    return errorResponse(res, 500, error.message);
+    console.error("register error:", error);
+    return errorResponse(res, 500, "Registration failed. Please try again.");
   }
 };
 
@@ -146,7 +147,8 @@ export const login = async (req, res) => {
       user: user.toSafeObject(),
     });
   } catch (error) {
-    return errorResponse(res, 500, error.message);
+    console.error("login error:", error);
+    return errorResponse(res, 500, "Login failed. Please try again.");
   }
 };
 
@@ -159,14 +161,15 @@ export const logout = async (req, res) => {
         const decoded = jwt.verify(token, process.env.JWT_REFRESH_SECRET);
         await User.findByIdAndUpdate(decoded.id, { refreshToken: null });
       } catch {
-        // Expired — cookies clear kar do
+        // Token expired ya invalid — cookies clear karna kaafi hai
       }
     }
     res.clearCookie("accessToken");
     res.clearCookie("refreshToken");
     return successResponse(res, 200, "Logged out successfully!");
   } catch (error) {
-    return errorResponse(res, 500, error.message);
+    console.error("logout error:", error);
+    return errorResponse(res, 500, "Logout failed. Please try again.");
   }
 };
 
@@ -190,21 +193,28 @@ export const refreshToken = async (req, res) => {
     return errorResponse(res, 401, "Session expired. Please login again");
   }
 };
-
 // GET /api/auth/me
 export const getMe = async (req, res) => {
   try {
-    const user = await User.findById(req.user._id);
-    if (!user) return errorResponse(res, 404, "User not found");
     return successResponse(res, 200, "Authenticated", {
-      user: user.toSafeObject(),
+      user: req.user.toSafeObject(),
     });
   } catch (error) {
-    return errorResponse(res, 500, error.message);
+    console.error("getMe error:", error);
+    return errorResponse(res, 500, "Something went wrong. Please try again.");
   }
 };
+
 // OAuth Callback
 export const oauthCallback = async (req, res) => {
+  const frontendUrl = process.env.FRONTEND_URL;
+  if (!frontendUrl) {
+    console.error("FRONTEND_URL env variable is not set");
+    return res
+      .status(500)
+      .json({ success: false, message: "Server configuration error" });
+  }
+
   try {
     const user = req.user;
     const accessToken = generateAccessToken(user._id);
@@ -214,8 +224,9 @@ export const oauthCallback = async (req, res) => {
     await user.save();
     setAccessTokenCookie(res, accessToken);
     setRefreshTokenCookie(res, refreshToken);
-    res.redirect(`${process.env.FRONTEND_URL}/oauth-success`);
+    res.redirect(`${frontendUrl}/oauth-success`);
   } catch (error) {
-    res.redirect(`${process.env.FRONTEND_URL}/login?error=oauth_failed`);
+    console.error("oauthCallback error:", error);
+    res.redirect(`${frontendUrl}/login?error=oauth_failed`);
   }
 };

@@ -9,6 +9,7 @@ const cartItemSchema = new mongoose.Schema(
     brand: { type: String, default: "" },
     category: { type: String, default: "" },
     rating: { type: Number, default: 0 },
+    weight: { type: Number, default: 0 }, // kg — delivery fee ke liye
     quantity: { type: Number, required: true, min: 1, max: 10, default: 1 },
   },
   { _id: true },
@@ -20,7 +21,7 @@ const cartSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
       required: true,
-      unique: true, // Har user ka sirf ek cart
+      unique: true,
       index: true,
     },
     items: {
@@ -33,17 +34,24 @@ const cartSchema = new mongoose.Schema(
 
 // ─── Virtuals ─────────────────────────────────────
 
-// Total items count
 cartSchema.virtual("totalItems").get(function () {
   return this.items.reduce((sum, item) => sum + item.quantity, 0);
 });
 
-// Total price
 cartSchema.virtual("totalPrice").get(function () {
   return parseFloat(
     this.items
       .reduce((sum, item) => sum + item.price * item.quantity, 0)
       .toFixed(2),
+  );
+});
+
+// Total weight virtual
+cartSchema.virtual("totalWeight").get(function () {
+  return parseFloat(
+    this.items
+      .reduce((sum, item) => sum + (item.weight || 0) * item.quantity, 0)
+      .toFixed(3),
   );
 });
 

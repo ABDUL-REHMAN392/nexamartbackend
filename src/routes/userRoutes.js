@@ -10,14 +10,10 @@ import {
   deleteAccount,
 } from "../controllers/userController.js";
 import { protect } from "../middlewares/authMiddleware.js";
-import {
-  uploadAvatar as multerUpload,
-  handleMulterError,
-} from "../middlewares/Uploadmiddleware.js";
+import { uploadAvatar as multerUpload } from "../middlewares/Uploadmiddleware.js";
 
 const router = express.Router();
 
-// protected routes
 router.use(protect);
 
 // ─── Profile ──────────────────────────────────────
@@ -26,15 +22,14 @@ router.put("/profile", updateProfile);
 router.put("/change-password", changePassword);
 
 // ─── Avatar ───────────────────────────────────────
-router.post("/avatar", multerUpload, handleMulterError, uploadAvatar);
+router.post("/avatar", multerUpload, uploadAvatar);
 router.delete("/avatar", removeAvatar);
 
-// ─── Address (Google Maps) ────────────────────────
+// ─── Address ──────────────────────────────────────
 router.get("/address", getAddress);
 router.put("/address", saveAddress);
 
 // ─── Delete Account ───────────────────────────────
 router.delete("/profile", deleteAccount);
-
 
 export default router;

@@ -1,6 +1,6 @@
 import multer from "multer";
 
-// ─── Memory Storage (disk pe nahi, RAM mein) ──────
+// ─── Memory Storage ──────────────────────────────────
 const storage = multer.memoryStorage();
 
 // ─── File Filter (sirf images allow) ─────────────
@@ -25,24 +25,3 @@ const upload = multer({
 
 // ─── Single Avatar Upload ─────────────────────────
 export const uploadAvatar = upload.single("avatar");
-
-// ─── Multer Error Handler ─────────────────────────
-export const handleMulterError = (err, req, res, next) => {
-  if (err instanceof multer.MulterError) {
-    if (err.code === "LIMIT_FILE_SIZE") {
-      return res.status(400).json({
-        success: false,
-        message: "Image size must not exceed 2MB",
-      });
-    }
-  }
-
-  if (err.message === "Only JPG, PNG, and WebP images are allowed") {
-    return res.status(400).json({
-      success: false,
-      message: err.message,
-    });
-  }
-
-  next(err);
-};

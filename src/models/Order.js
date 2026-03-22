@@ -3,31 +3,32 @@ import mongoose from "mongoose";
 // ─── Order Item Snapshot ──────────────────────────
 const orderItemSchema = new mongoose.Schema(
   {
-    productId: { type: Number,  required: true },
-    title:     { type: String,  required: true },
-    price:     { type: Number,  required: true }, 
-    image:     { type: String,  required: true },
-    brand:     { type: String,  default: "" },
-    category:  { type: String,  default: "" },
-    quantity:  { type: Number,  required: true, min: 1 },
-    subtotal:  { type: Number,  required: true }, // price * quantity
+    productId: { type: Number, required: true },
+    title: { type: String, required: true },
+    price: { type: Number, required: true },
+    image: { type: String, required: true },
+    brand: { type: String, default: "" },
+    category: { type: String, default: "" },
+    quantity: { type: Number, required: true, min: 1 },
+    weight: { type: Number, default: 0 }, // kg per item
+    subtotal: { type: Number, required: true }, // price * quantity
   },
-  { _id: false }
+  { _id: false },
 );
 
 // ─── Address Snapshot ─────────────────────────────
 const addressSnapshotSchema = new mongoose.Schema(
   {
-    formatted:  { type: String, required: true },
-    street:     { type: String, default: "" },
-    city:       { type: String, required: true },
-    state:      { type: String, default: "" },
-    country:    { type: String, required: true },
+    formatted: { type: String, required: true },
+    street: { type: String, default: "" },
+    city: { type: String, required: true },
+    state: { type: String, default: "" },
+    country: { type: String, required: true },
     postalCode: { type: String, default: "" },
-    lat:        { type: Number, default: null },
-    lng:        { type: Number, default: null },
+    lat: { type: Number, default: null },
+    lng: { type: Number, default: null },
   },
-  { _id: false }
+  { _id: false },
 );
 
 // ─── Order Schema ─────────────────────────────────
@@ -64,10 +65,13 @@ const orderSchema = new mongoose.Schema(
     },
 
     // ── Pricing ────────────────────────────────────
-    itemsTotal:    { type: Number, required: true }, 
-    deliveryFee:   { type: Number, default: 0 },     
-    discount:      { type: Number, default: 0 },     
-    totalAmount:   { type: Number, required: true }, 
+    itemsTotal: { type: Number, required: true },
+    deliveryFee: { type: Number, default: 0 },
+    discount: { type: Number, default: 0 },
+    totalAmount: { type: Number, required: true },
+
+    // ── Weight ─────────────────────────────────────
+    totalWeightKg: { type: Number, default: 0 }, // cart ka total weight
 
     // ── Payment ────────────────────────────────────
     paymentMethod: {
@@ -81,7 +85,6 @@ const orderSchema = new mongoose.Schema(
       default: "pending",
     },
 
-    // Stripe Payment Intent ID  ─────────────
     stripePaymentIntentId: { type: String, default: null },
 
     // ── Order Status ───────────────────────────────
@@ -92,17 +95,16 @@ const orderSchema = new mongoose.Schema(
     },
 
     // ── Cancel Info ────────────────────────────────
-    cancelledAt:     { type: Date, default: null },
+    cancelledAt: { type: Date, default: null },
     cancellationReason: { type: String, default: null },
 
     // ── Timestamps ─────────────────────────────────
     deliveredAt: { type: Date, default: null },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 // ─── Auto Order Number ────────────────────────────
-// NXM-20240315-XXXXX format
 orderSchema.pre("save", async function () {
   if (!this.isNew) return;
 
@@ -112,7 +114,7 @@ orderSchema.pre("save", async function () {
     String(date.getMonth() + 1).padStart(2, "0") +
     String(date.getDate()).padStart(2, "0");
 
-  const random = Math.floor(10000 + Math.random() * 90000); // 5 digit
+  const random = Math.floor(10000 + Math.random() * 90000);
   this.orderNumber = `NXM-${dateStr}-${random}`;
 });
 

@@ -29,9 +29,3 @@ export const setRefreshTokenCookie = (res, token) => {
     maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
   });
 };
-
-export const generateOTP = () =>
-  Math.floor(100000 + Math.random() * 900000).toString();
-
-export const getOTPExpiry = (minutes = 10) =>
-  new Date(Date.now() + minutes * 60 * 1000);

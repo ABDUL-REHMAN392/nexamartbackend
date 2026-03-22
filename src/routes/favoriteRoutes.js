@@ -7,18 +7,18 @@ import {
   toggleFavorite,
   clearFavorites,
 } from "../controllers/favoriteController.js";
-import { protect } from "../middlewares/authMiddleware.js";
+import { protect, customerOnly } from "../middlewares/authMiddleware.js";
 
 const router = express.Router();
 
-// protected routes
-router.use(protect);
+// only for logged-in customers — admin block
+router.use(protect, customerOnly);
 
 // ─── Favorites ────────────────────────────────────
-router.get("/", getFavorites); // Saare favorites
-router.post("/", addFavorite); // Add karo
+router.get("/", getFavorites); 
+router.post("/", addFavorite);
 router.post("/toggle", toggleFavorite); // Toggle — frontend ke liye easy
-router.delete("/", clearFavorites); // Saare clear karo
+router.delete("/", clearFavorites); 
 router.get("/:productId/check", checkFavorite); // Heart icon check
 router.delete("/:productId", removeFavorite); // Ek remove karo
 

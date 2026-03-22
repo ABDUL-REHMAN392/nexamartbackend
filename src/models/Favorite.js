@@ -26,7 +26,6 @@ const favoriteSchema = new mongoose.Schema(
   { timestamps: true },
 );
 
-// Ek user ek product sirf ek baar favorite kar sake
 favoriteSchema.index({ user: 1, productId: 1 }, { unique: true });
 
 export default mongoose.model("Favorite", favoriteSchema);

@@ -164,7 +164,8 @@ export const getDashboardStats = async (req, res) => {
       topProducts,
     });
   } catch (error) {
-    return errorResponse(res, 500, error.message);
+    console.error("controller error:", error);
+    return errorResponse(res, 500, "Something went wrong. Please try again.");
   }
 };
 
@@ -198,7 +199,8 @@ export const getAllUsers = async (req, res) => {
       pagination: { total, page, pages: Math.ceil(total / limit), limit },
     });
   } catch (error) {
-    return errorResponse(res, 500, error.message);
+    console.error("controller error:", error);
+    return errorResponse(res, 500, "Something went wrong. Please try again.");
   }
 };
 
@@ -220,6 +222,7 @@ export const toggleUserActive = async (req, res) => {
       { isActive: user.isActive },
     );
   } catch (error) {
-    return errorResponse(res, 500, error.message);
+    console.error("controller error:", error);
+    return errorResponse(res, 500, "Something went wrong. Please try again.");
   }
 };
