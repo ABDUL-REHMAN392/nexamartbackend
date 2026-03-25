@@ -256,20 +256,19 @@ export const saveAddress = async (req, res) => {
 // DELETE /api/users/profile
 export const deleteAccount = async (req, res) => {
   try {
-    const { password } = req.body;
-
-    if (!password)
-      return errorResponse(
-        res,
-        400,
-        "Password is required to delete your account",
-      );
+    const { password } = req.body || {};
 
     const user = await User.findById(req.user._id).select("+password");
     if (!user) return errorResponse(res, 404, "User not found");
 
-    // Social login users ke liye password check skip
-    if (user.password) {
+    // Social login check — googleId ya facebookId ho to password ki zaroorat nahi
+    const isSocialUser = !!(user.googleId || user.facebookId);
+
+    if (!isSocialUser) {
+      // Normal user — password required
+      if (!password)
+        return errorResponse(res, 400, "Password is required to delete your account");
+
       const isMatch = await user.comparePassword(password);
       if (!isMatch) return errorResponse(res, 400, "Incorrect password");
     }
