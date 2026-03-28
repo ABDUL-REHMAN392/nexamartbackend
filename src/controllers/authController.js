@@ -5,6 +5,7 @@ import {
   generateRefreshToken,
   setAccessTokenCookie,
   setRefreshTokenCookie,
+  clearAuthCookies,
 } from "../utils/tokenUtils.js";
 import { successResponse, errorResponse } from "../utils/apiResponse.js";
 
@@ -164,8 +165,7 @@ export const logout = async (req, res) => {
         // Token expired ya invalid — cookies clear karna kaafi hai
       }
     }
-    res.clearCookie("accessToken");
-    res.clearCookie("refreshToken");
+    clearAuthCookies(res);
     return successResponse(res, 200, "Logged out successfully!");
   } catch (error) {
     console.error("logout error:", error);
